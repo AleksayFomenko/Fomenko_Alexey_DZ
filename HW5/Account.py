@@ -61,6 +61,28 @@ class Account:
         plt.show()
         return history_df
 
+class CheckingAccount(Account): 
+    def __init__(self):
+        super().__init__()
+        self.account_type = "CheckingAccount"
+
+class SavingsAccount(Account): 
+    def __init__(self):
+        super().__init__()
+        self.account_type = "SavingsAccount"
+    
+    def apply_interest(self, rate): # расчёт процентов на остаток
+        pass
+
+
+    def withdrow(self, amount): # нельзя снять больше 50 %
+        if amount <= 0:
+            raise ValueError("Сумма снятия со счёта должна быть положительной")
+        if self._balance - amount < 0:
+            self._add_operation("withdrow", amount, "fail")
+        else:
+            self._balance -= amount
+            self._add_operation("withdrow", amount, "success")
 
 ac1 = Account("pasha", 200)
 ac2 = Account("hales", 3234)
