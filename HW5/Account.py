@@ -4,13 +4,14 @@ from matplotlib import dates as mdates, pyplot as plt
 import re
 import os
 
+
 class Account:  # Базовый класс - банковский счёт
     _account_counter = 100000
 
     def __init__(self, account_holder, balance=0):
         self.account_type = "BaseAccount"
-        self.valid_operations = ("deposit","withdraw")
-        self.valid_status = ("success","fail")
+        self.valid_operations = ("deposit", "withdraw")
+        self.valid_status = ("success", "fail")
         self._validate_balance(balance)
         self._validate_holder(account_holder)
         self._balance = balance
@@ -21,16 +22,16 @@ class Account:  # Базовый класс - банковский счёт
 
     def _validate_holder(self, account_holder):
         if not re.fullmatch(r"^[A-ZА-Я][a-zа-я]+ [A-ZА-Я][a-zа-я]+", account_holder):
-            raise ValueError("Неверный формат имени владельца счёта") 
-        
+            raise ValueError("Неверный формат имени владельца счёта")
+
     def _validate_balance(self, balance):
         if balance < 0:
             raise ValueError("Баланс не может быть отрицательным")
-    
+
     def _validate_amount(self, amount):
         if amount < 0:
             raise ValueError("Сумма должна быть положительной")
-    
+
     def _operations_history_empty(self):
         if not self.operation_history:
             print("Отсутствуют операции по данному счёту")
@@ -44,7 +45,7 @@ class Account:  # Базовый класс - банковский счёт
             "account_type": self.account_type,
             "amount": amount,
             "date": datetime.now(),
-            "balance": self._balance,
+            "balance_after": self._balance,
             "status": status,
         }
         self.operation_history.append(operation)
@@ -70,12 +71,14 @@ class Account:  # Базовый класс - банковский счёт
             return None
         return pd.DataFrame(self.operation_history)
 
-    def plot_history(self):  # Метод для формирования датафрейма из истории операций и его визуализация
+    def plot_history(
+        self,
+    ):  # Метод для формирования датафрейма из истории операций и его визуализация
         if self._operations_history_empty():
             return None
         history_df = pd.DataFrame(self.operation_history)
         x = history_df["date"]
-        y = history_df["balance"]
+        y = history_df["balance_after"]
         fig, ax = plt.subplots()
         ax.plot(x, y)
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%d-%m-%y %H:%M:%S"))
@@ -86,6 +89,7 @@ class Account:  # Базовый класс - банковский счёт
         plt.grid()
         plt.show()
         plt.close(fig)
+        return fig
 
     def analyze_large_transactions(self, n):  # Метод для вывода n крупных транзакций
         if self._operations_history_empty():
@@ -105,7 +109,7 @@ class Account:  # Базовый класс - банковский счёт
         success_transactions_df.reset_index(drop=True, inplace=True)
         return success_transactions_df.head(n)
 
-    def load_dirty_file(self,path):
+    def load_dirty_file(self, path):  # Метод для загрузки файла и обновления баланса
         _, extansion = os.path.splitext(path)
         if extansion == ".csv":
             dirty_df = pd.read_csv(path)
@@ -114,25 +118,26 @@ class Account:  # Базовый класс - банковский счёт
         else:
             print(f"Файл с расширением {extansion} не поддерживатеся")
             return None
-        print(self.clean_history(dirty_df))
-        
-    def clean_history(self, df):  # Метод очистки истории для CheckingAccount (доступны только deposit и withdraw)
-        print(self.valid_operations, '               ', self.account_type, '    ', self.account_number)
-        print(self.account_type)
-        print(df.iloc[35,1] == self.account_type)
-        cleaned_df = df[
-            (df['account_number'] == self.account_number) &
-            (df['account_type'] == self.account_type) &
-            (pd.to_datetime(df['date'], errors='coerce').notna()) &
-            (df['operation'].isin(self.valid_operations)) &
-            (df['amount'] > 0) &
-            (df['balance_after'] >= 0) &
-            (df['status'].isin(self.valid_status))
-            #Баланс после операции не может быть отрицательным 
+        self.operation_history = (
+            self.filter_history(dirty_df).sort_values(by="date").to_dict("records")
+        )
+        self._balance = self.operation_history[-1]["balance_after"]
+
+    def filter_history(
+        self, dirty_df
+    ):  # Метод фильтрации истории операций из внешнего файла
+        cleaned_df = dirty_df[
+            (dirty_df["account_number"] == self.account_number)
+            & (dirty_df["account_type"] == self.account_type)
+            & (pd.to_datetime(dirty_df["date"], errors="coerce").notna())
+            & (dirty_df["operation"].isin(self.valid_operations))
+            & (dirty_df["amount"] > 0)
+            & (dirty_df["balance_after"] >= 0)
+            & (dirty_df["status"].isin(self.valid_status))
         ].copy()
-        # Удаление строк с NaN в operation (опечатки)
         cleaned_df = cleaned_df.dropna()
-        
+        if cleaned_df.empty:
+            print(f"Нет операций по счёту {self.account_number}")
         return cleaned_df
 
 
@@ -141,11 +146,13 @@ class CheckingAccount(Account):  # Класс-наследник базовог�
         super().__init__(account_holder, balance)
         self.account_type = "checking"
 
+
 class SavingsAccount(Account):  # Класс-наследник базового класса - сберегательный счёт
     def __init__(self, account_holder, balance):
         super().__init__(account_holder, balance)
         self.account_type = "savings"
-        self.valid_operations = ("deposit","withdraw","interest")
+        self.valid_operations = ("deposit", "withdraw", "interest")
+
     def apply_interest(
         self, rate
     ):  # Выйчисляет выплату через год от начального остатка, только расчитывает
@@ -162,37 +169,72 @@ class SavingsAccount(Account):  # Класс-наследник базового
             self._add_operation("withdraw", amount, "success")
 
 
-#ac1 = Account("Pf Kf", 200)
-#ac2 = Account("Аsfsваы Аdfs", 4244)
-'''
-ac1.withdraw(300)
-ac1.deposit(600)
-ac1.withdraw(300)
-ac1.withdraw(3000)
-ac1.deposit(4060)
-ac1.withdraw(77006)
-ac1.withdraw(4456000)
-ac1.deposit(4564060)
-ac1.withdraw(3456006)
+# Тестирование
 
-print(ac1.get_history())
-print(ac1.analyze_large_transactions(2))
-#print(ac1.plot_history())
-print(ac1.plot_history())
-'''
-ac2 = SavingsAccount("Аsfsваы Аdfs", 4244)
-ac2.load_dirty_file(r"HW5\transactions_dirty.csv")
-'''
-ac2.withdraw(3000)
-ac2.deposit(4060)
-ac2.withdraw(77006)
-ac2.withdraw(4456000)
-ac2.deposit(4564060)
-ac2.withdraw(3456006)
+# 1. Создание аккаунта с неправильным именем
+try:
+    bad_acc1 = Account("ivan ivanov")  # Имя без заглавных букв
+except ValueError as e:
+    print("1.", e)
 
-print(ac2.get_history())
-print(ac2.apply_interest(7))
-print(ac2.analyze_large_transactions(2))
-#print(ac1.plot_history())
-print(ac2.plot_history())
-'''
+# 2. Создание аккаунта с отрицательным балансом
+try:
+    bad_acc2 = Account("Иван Иванов", -100)
+except ValueError as e:
+    print("2.", e)
+
+# 3. Попытка пополнить отрицательной суммой
+acc = Account("Иван Иванов", 100)
+try:
+    acc.deposit(-50)
+except ValueError as e:
+    print("3.", e)
+
+# 4. Попытка снять больше, чем есть на счете
+acc.withdraw(200)  # Баланс 100, снимаем 200
+print(
+    "4.", acc.get_balance()
+)  # Баланс должен остаться 100, операция зафиксирована как fail
+
+# 5. Попытка загрузить файл с неправильным расширением
+print("5.")
+acc.load_dirty_file(
+    "data.txt"
+)  # Должно вывести сообщение о неподдерживаемом расширении
+
+
+# 6. Попытка снять больше 50% для SavingsAccount
+savings_acc = SavingsAccount("Петр Петров", 1000)
+try:
+    savings_acc.withdraw(600)  # 60% от 1000, должно быть запрещено
+except Exception as e:
+    print("6.", e)
+print("6.", savings_acc.get_balance())  # Баланс должен остаться 1000
+
+# 7. Попытка применить отрицательный процент
+try:
+    savings_acc.apply_interest(-5)
+except ValueError as e:
+    print("7.", e)
+
+# Создаем аккаунт
+acc = Account("Иван Иванов", 1000)
+
+# Проверка пополнения
+acc.deposit(500)
+print(acc.get_balance())  # Ожидается 1500
+
+# Проверка снятия
+acc.withdraw(300)
+print(acc.get_balance())  # Ожидается 1200
+
+# Попытка снять больше, чем есть
+acc.withdraw(2000)
+print(acc.get_balance())  # Ожидается 1200, операция должна быть зафиксирована как fail
+
+# Проверка истории
+history = acc.get_history()
+print(history)
+
+# Визуализация
+acc.plot_history()
