@@ -15,31 +15,30 @@ class Account:  # Базовый класс - банковский счёт
         self._validate_balance(balance)
         self._validate_holder(account_holder)
         self._balance = balance
-        Account._account_counter += 1
         self.holder = account_holder
+        Account._account_counter += 1
         self.account_number = f"ACC-{self._account_counter}"
         self.operation_history = []
 
-    def _validate_holder(self, account_holder):
+    def _validate_holder(self, account_holder): # Валидация имени владельца счёта
         if not re.fullmatch(r"^[A-ZА-Я][a-zа-я]+ [A-ZА-Я][a-zа-я]+", account_holder):
             raise ValueError("Неверный формат имени владельца счёта")
 
-    def _validate_balance(self, balance):
+    def _validate_balance(self, balance): # Валидация баланса
         if balance < 0:
             raise ValueError("Баланс не может быть отрицательным")
 
-    def _validate_amount(self, amount):
+    def _validate_amount(self, amount): # Валидация суммы
         if amount < 0:
             raise ValueError("Сумма должна быть положительной")
 
-    def _operations_history_empty(self):
+    def _operations_history_empty(self):# Проверка на пустоту списка операций
         if not self.operation_history:
             print("Отсутствуют операции по данному счёту")
             return True
 
-    def _add_operation(
-        self, operation_type, amount, status
-    ):  # Метод для добавления операций в историю
+    def _add_operation( 
+        self, operation_type, amount, status):# Метод для добавления операций в историю
         operation = {
             "operation_type": operation_type,
             "account_type": self.account_type,
